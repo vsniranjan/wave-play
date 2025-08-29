@@ -7,8 +7,7 @@ const global = {
     totalPages: 1,
   },
   api: {
-    key: CONFIG.TMDB_API_KEY,
-    url: "https://api.themoviedb.org/3",
+    url: "/.netlify/functions/tmdb-proxy",
   },
 };
 
@@ -282,19 +281,27 @@ function initSwiper() {
 
 // Make Request to search
 async function searchAPIData() {
-  const API_KEY = global.api.key;
-  const API_URL = global.api.url;
-
   showSpinner();
 
-  const response = await fetch(
-    `${API_URL}/search/${global.search.type}?api_key=${API_KEY}&language=en-US&query=${global.search.term}&page=${global.search.page}`
-  );
+  try {
+    const response = await fetch(
+      `${global.api.url}?endpoint=/search/${global.search.type}&language=en-US&query=${global.search.term}&page=${global.search.page}`
+    );
 
-  const data = await response.json();
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-  hideSpinner();
-  return data;
+    const data = await response.json();
+    hideSpinner();
+
+    return data;
+  } catch (error) {
+    hideSpinner();
+    console.error("Search API error:", error);
+    showAlert("Search failed. Please try again.");
+    return { results: [], total_pages: 0, page: 1, total_results: 0 };
+  }
 }
 // Search movies/shows
 async function search() {
@@ -446,20 +453,27 @@ function addCommasToNumber(number) {
 
 // Fetch data from TMDB API
 async function fetchAPIData(endpoint) {
-  const API_KEY = global.api.key;
-  const API_URL = global.api.url;
-
   showSpinner();
 
-  const response = await fetch(
-    `${API_URL}/${endpoint}?api_key=${API_KEY}&language=en-US`
-  );
+  try {
+    const response = await fetch(
+      `${global.api.url}?endpoint=/${endpoint}&language=en-US`
+    );
 
-  const data = await response.json();
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-  hideSpinner();
+    const data = await response.json();
+    hideSpinner();
 
-  return data.results ? data.results : data;
+    return data.results ? data.results : data;
+  } catch (error) {
+    hideSpinner();
+    console.error("API fetch error:", error);
+    showAlert("Failed to fetch data. Please try again.");
+    return [];
+  }
 }
 
 // Init App
@@ -476,7 +490,6 @@ function init() {
       break;
 
     case "/movie-details.html":
-      console.log("Movie Details");
       displayMovieDetails();
       break;
 
@@ -485,7 +498,9 @@ function init() {
       break;
 
     case "/search.html":
-      search();
+      if (window.location.search.includes("search-term=")) {
+        search();
+      }
       break;
   }
 
